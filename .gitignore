@@ -1,0 +1,33 @@
+# зависимости и сборка
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# секреты и окружение
+.env
+.env.*
+!.env.example
+
+# Supabase CLI: локальное состояние, не схема
+supabase/.branches/
+supabase/.temp/
+supabase/.env
+
+# дампы перед откатом схемы (CHANGELOG.md)
+backups/
+
+# генерируется из схемы
+src/lib/database.types.ts
+
+# редакторы и ОС
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# логи
+*.log
+npm-debug.log*
