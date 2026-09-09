@@ -154,3 +154,64 @@ button.link {
   font-size: 15px;
   font-weight: 500;
 }
+
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip {
+  width: auto;
+  min-height: 42px;
+  padding: 0 16px;
+  border: 1px solid var(--line);
+  border-radius: 21px;
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 500;
+}
+.chip.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+  font-weight: 600;
+}
+
+.select-like {
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--text);
+  font-weight: 400;
+}
+
+.picker {
+  margin-top: 8px;
+  max-height: 46vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+}
+.picker-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  text-align: left;
+  border-radius: 0;
+  border-bottom: 1px solid var(--line);
+  background: none;
+  color: var(--text);
+  font-weight: 400;
+}
+.picker-row:last-child { border-bottom: 0; }
+.picker-row.custom { color: var(--accent); font-weight: 600; }
+.badge {
+  flex: none;
+  font-size: 13px;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 2px 6px;
+}
+
+.times { display: flex; flex-wrap: wrap; gap: 8px; }
+.times input { width: auto; flex: 1 1 30%; min-width: 96px; text-align: center; }

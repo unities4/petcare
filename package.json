@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "types": "supabase gen types typescript --linked > src/lib/database.types.ts"
+    "types": "npx --yes supabase@latest gen types typescript --linked > src/lib/database.types.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.116.0",

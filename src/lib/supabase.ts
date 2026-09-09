@@ -18,3 +18,9 @@ export const supabase = createClient<Database>(url, anonKey, {
     detectSessionInUrl: false,
   },
 })
+
+// Только в разработке: клиент доступен из консоли для отладки запросов и RLS.
+// В production-сборке ветка вырезается целиком.
+if (import.meta.env.DEV) {
+  ;(window as unknown as { sb: typeof supabase }).sb = supabase
+}
