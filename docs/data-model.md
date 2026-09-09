@@ -9,7 +9,8 @@
 |---|---|
 | `profiles` | Отображаемое имя и аватар. 1:1 с `auth.users` |
 | `user_identities` | Контактные каналы: email, позже phone и telegram (ADR-003) |
-| `pets` | Питомец. `timezone` нужен для расчёта напоминаний |
+| `pets` | Питомец. `timezone` нужен для расчёта напоминаний. `feeding_mode`, `tracks_feedings` |
+| `feeding_plans` | Периоды режима кормления: корм, норма, приёмы, окна, пачка (ADR-012) |
 | `pet_members` | Кто и с какой ролью ведёт питомца |
 | `pet_invitations` | Приглашения: ссылка, QR, email. Хранится хеш токена |
 | `events` | Единая лента: кормления, симптомы, лекарства и прочее (ADR-007) |
@@ -53,10 +54,9 @@
 рутины — это `feeding` с другим `kind`, а не отдельные типы событий (ADR-011).
 
 ```
-feeding     { kind: 'meal'|'treat'|'table'|'scavenged',
-              food: string, grams?: number }
-symptom     { symptom: 'vomiting'|'diarrhea'|'refusal'|'lethargy'|'other',
-              severity?: 1|2|3 }
+feeding     { kind: 'meal'|'treat'|'table'|'scavenged'|'other_food'|'skipped',
+              food?: string, grams?: number }
+symptom     { symptom: <код из списка ниже>, severity?: 1|2|3, detail?: string }
 medication  { name: string, dose?: string }
 vaccination { vaccine: string, next_due?: date, clinic?: string }
 vet_visit   { clinic?: string, doctor?: string, diagnosis?: string }
@@ -81,16 +81,39 @@ where s.id = :symptom_event_id
 order by f.occurred_at desc;
 ```
 
+`kind = 'skipped'` — это пропущенное плановое кормление, то есть отсутствие еды.
+В выборку «что съел» оно не идёт, но на линии дневника показывается: «не ела
+двенадцать часов» — тоже факт, объясняющий эпизод. Запросу нужен явный фильтр.
+
 Новый подтип попадает в этот запрос сам собой — фильтр идёт по `type`, а не по
 `kind`. В интерфейсе строки с `kind <> 'meal'` выделяются: именно они объясняют
 эпизод, а `meal` — фон.
+
+## Коды симптомов
+
+Набор живёт в клиенте, база хранит строку. Расширяется без миграции (ADR-007).
+
+```
+ЖКТ         vomiting_food | vomiting_bile | vomiting_foam | vomiting_blood
+            diarrhea | constipation | refusal | bloating | drooling | regurgitation
+Кожа и уши  itching | redness | paw_licking | head_shaking | ear_discharge | hair_loss
+Общее       lethargy | thirst | limping | cough | tearing | trembling
+Прочее      other  (обязательно поле detail)
+```
+
+Кожа и уши — не для полноты списка: зуд, лапы и уши составляют типичную внешнюю
+картину пищевой непереносимости у собак.
 
 ## Расхождения с текущими миграциями
 
 Здесь то, что решено в ADR, но ещё не залито в схему. Закрывается миграцией в
 соответствующей задаче, не правкой применённых файлов.
 
-- **`pets.default_food`** — корм по умолчанию (ADR-010). Нужен в задаче 2
+- **`feeding_plans`** — таблицы нет вовсе (ADR-012). Нужна в задаче 2. Поля:
+  `pet_id`, `food_name`, `daily_norm_g`, `meals_per_day`, `times time[]`,
+  `package_weight_g`, `package_opened_on`, `started_at`, `ended_at`
+- **`pets.feeding_mode`** (`free` / `scheduled`) и **`pets.tracks_feedings`** —
+  тоже задача 2
 - **`pets.timezone`** — в миграции стоит default `'Europe/Amsterdam'`. Проверьте,
   что это ваша зона: от неё считаются напоминания (ADR-001). Меняется при
   создании питомца, но правильный default избавит от сюрприза
