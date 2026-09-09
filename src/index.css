@@ -116,3 +116,41 @@ button.link {
 .spacer { flex: 1; }
 .hint { font-size: 15px; color: var(--muted); }
 .hint ol { padding-left: 20px; margin: 8px 0 0; }
+
+.tabs {
+  display: flex;
+  gap: 4px;
+  background: var(--line);
+  border-radius: 10px;
+  padding: 3px;
+  margin-bottom: 22px;
+}
+.tab {
+  flex: 1;
+  min-height: 40px;
+  border-radius: 8px;
+  background: none;
+  color: var(--muted);
+  font-weight: 500;
+}
+.tab.active {
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.with-action { position: relative; }
+.with-action input { padding-right: 92px; }
+.reveal {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  transform: translateY(-50%);
+  width: auto;
+  min-height: 36px;
+  padding: 0 10px;
+  background: none;
+  color: var(--muted);
+  font-size: 15px;
+  font-weight: 500;
+}

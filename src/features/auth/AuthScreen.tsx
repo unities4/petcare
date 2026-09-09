@@ -1,136 +1,166 @@
 import { useState } from 'react'
 import { supabase } from '../../lib/supabase'
-import { DevSignIn } from './DevSignIn'
+import { humanize } from './errors'
+import { OtpSignIn } from './OtpSignIn'
 
-type Step = 'email' | 'code'
+/** Должно совпадать с auth.minimum_password_length в supabase/config.toml. */
+const MIN_PASSWORD = 8
 
-/** Должно совпадать с auth.email.otp_length в supabase/config.toml. */
-const OTP_LENGTH = 6
+/** Вход по коду показываем, только когда у проекта настроен свой SMTP (ADR-015). */
+const OTP_AVAILABLE = import.meta.env.VITE_EMAIL_OTP_ENABLED === 'true'
 
-/** Сообщения Supabase приходят по-английски, а показывать их так — плохо. */
-function humanize(message: string): string {
-  const m = message.toLowerCase()
-  if (m.includes('invalid') && m.includes('token')) return 'Код неверный или просрочен.'
-  if (m.includes('expired')) return 'Код просрочен. Запросите новый.'
-  if (m.includes('rate limit') || m.includes('too many')) {
-    return 'Слишком много попыток. Подождите минуту.'
-  }
-  if (m.includes('invalid') && m.includes('email')) return 'Похоже, адрес введён с ошибкой.'
-  if (m.includes('failed to fetch') || m.includes('network')) {
-    return 'Нет связи с сервером. Проверьте интернет.'
-  }
-  return message
-}
+type Mode = 'signin' | 'signup'
 
 export function AuthScreen() {
-  const [step, setStep] = useState<Step>('email')
+  const [mode, setMode] = useState<Mode>('signin')
+  const [otp, setOtp] = useState(false)
   const [email, setEmail] = useState('')
-  const [code, setCode] = useState('')
+  const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [checkMail, setCheckMail] = useState(false)
 
-  async function sendCode(e: React.FormEvent) {
+  if (otp && OTP_AVAILABLE) return <OtpSignIn onBack={() => setOtp(false)} />
+
+  async function submit(e: React.FormEvent) {
     e.preventDefault()
     setBusy(true)
     setError(null)
-    const { error } = await supabase.auth.signInWithOtp({
-      email: email.trim(),
-      options: { shouldCreateUser: true },
-    })
+
+    const creds = { email: email.trim(), password }
+
+    if (mode === 'signin') {
+      const { error } = await supabase.auth.signInWithPassword(creds)
+      setBusy(false)
+      if (error) setError(humanize(error.message))
+      return
+    }
+
+    const { data, error } = await supabase.auth.signUp(creds)
     setBusy(false)
-    if (error) setError(humanize(error.message))
-    else setStep('code')
+    if (error) {
+      setError(humanize(error.message))
+      return
+    }
+    // Если подтверждение почты включено, сессии не будет: Supabase ждёт перехода
+    // по ссылке из письма. Сейчас подтверждение выключено (ADR-016), но код
+    // должен пережить его возврат.
+    if (!data.session) setCheckMail(true)
   }
 
-  async function verify(e: React.FormEvent) {
-    e.preventDefault()
-    setBusy(true)
-    setError(null)
-    // type: 'email' — код из письма. Сессия дальше подхватится onAuthStateChange.
-    const { error } = await supabase.auth.verifyOtp({
-      email: email.trim(),
-      token: code.trim(),
-      type: 'email',
-    })
-    setBusy(false)
-    if (error) setError(humanize(error.message))
-  }
-
-  if (step === 'email') {
+  if (checkMail) {
     return (
       <div className="screen">
-        <h1>PetCare</h1>
-        <p className="lead">Дневник питания и симптомов питомца.</p>
-
-        <form onSubmit={sendCode}>
-          <div className="field">
-            <label htmlFor="email">Почта</label>
-            <input
-              id="email"
-              type="email"
-              inputMode="email"
-              autoComplete="email"
-              autoCapitalize="none"
-              autoCorrect="off"
-              placeholder="you@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-          </div>
-          {error && <p className="error">{error}</p>}
-          <button type="submit" disabled={busy || email.trim().length < 5}>
-            {busy ? 'Отправляю…' : 'Получить код'}
-          </button>
-        </form>
-
-        <p className="hint" style={{ marginTop: 16 }}>
-          Пришлём код из {OTP_LENGTH} цифр. Пароль не нужен.
+        <h1>Проверьте почту</h1>
+        <p className="lead">
+          Отправили письмо на {email.trim()}. Перейдите по ссылке, чтобы завершить
+          регистрацию, и возвращайтесь сюда.
         </p>
-
-        {import.meta.env.DEV && <DevSignIn />}
+        <button
+          className="link"
+          type="button"
+          onClick={() => {
+            setCheckMail(false)
+            setMode('signin')
+          }}
+        >
+          Назад ко входу
+        </button>
       </div>
     )
   }
 
+  const tooShort = password.length < MIN_PASSWORD
+  const canSubmit = email.trim().length >= 5 && !tooShort && !busy
+
   return (
     <div className="screen">
-      <h1>Код из письма</h1>
-      <p className="lead">Отправили на {email}. Введите {OTP_LENGTH} цифр.</p>
+      <h1>PetCare</h1>
+      <p className="lead">Дневник питания и симптомов питомца.</p>
 
-      <form onSubmit={verify}>
+      <div className="tabs">
+        <button
+          type="button"
+          className={mode === 'signin' ? 'tab active' : 'tab'}
+          onClick={() => {
+            setMode('signin')
+            setError(null)
+          }}
+        >
+          Вход
+        </button>
+        <button
+          type="button"
+          className={mode === 'signup' ? 'tab active' : 'tab'}
+          onClick={() => {
+            setMode('signup')
+            setError(null)
+          }}
+        >
+          Регистрация
+        </button>
+      </div>
+
+      <form onSubmit={submit}>
         <div className="field">
+          <label htmlFor="email">Почта</label>
           <input
-            className="code"
-            type="text"
-            inputMode="numeric"
-            autoComplete="one-time-code"
-            pattern="[0-9]*"
-            maxLength={OTP_LENGTH}
-            placeholder={'0'.repeat(OTP_LENGTH)}
-            value={code}
-            onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
-            autoFocus
+            id="email"
+            type="email"
+            inputMode="email"
+            autoComplete="email"
+            autoCapitalize="none"
+            autoCorrect="off"
+            placeholder="you@example.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
             required
           />
         </div>
+
+        <div className="field">
+          <label htmlFor="password">Пароль</label>
+          <div className="with-action">
+            <input
+              id="password"
+              type={showPassword ? 'text' : 'password'}
+              autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
+              autoCapitalize="none"
+              autoCorrect="off"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+            <button type="button" className="reveal" onClick={() => setShowPassword((v) => !v)}>
+              {showPassword ? 'Скрыть' : 'Показать'}
+            </button>
+          </div>
+          {mode === 'signup' && (
+            <p className="hint" style={{ marginTop: 6 }}>
+              Минимум {MIN_PASSWORD} символов.
+            </p>
+          )}
+        </div>
+
         {error && <p className="error">{error}</p>}
-        <button type="submit" disabled={busy || code.length !== OTP_LENGTH}>
-          {busy ? 'Проверяю…' : 'Войти'}
+
+        <button type="submit" disabled={!canSubmit}>
+          {busy
+            ? mode === 'signin'
+              ? 'Вхожу…'
+              : 'Регистрирую…'
+            : mode === 'signin'
+              ? 'Войти'
+              : 'Зарегистрироваться'}
         </button>
       </form>
 
-      <button
-        className="link"
-        type="button"
-        onClick={() => {
-          setStep('email')
-          setCode('')
-          setError(null)
-        }}
-      >
-        Другой адрес
-      </button>
+      {OTP_AVAILABLE && (
+        <button className="link" type="button" onClick={() => setOtp(true)}>
+          Войти по коду из письма
+        </button>
+      )}
     </div>
   )
 }
