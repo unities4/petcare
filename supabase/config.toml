@@ -225,7 +225,7 @@ enable_signup = true
 # addresses. If disabled, only the new email is required to confirm.
 double_confirm_changes = true
 # If enabled, users need to confirm their email address before signing in.
-enable_confirmations = true
+enable_confirmations = false  # ВРЕМЕННО, ADR-016. Вернуть true до задачи 4
 # If enabled, users will need to reauthenticate or have logged in recently to change their password.
 secure_password_change = false
 # Controls the minimum amount of time that must pass before sending another signup confirmation or password reset email.
@@ -419,10 +419,15 @@ enabled = true
 
 # Вход по коду, а не по ссылке (ADR-002). Оба шаблона нужны: новому пользователю
 # Supabase шлёт confirmation, уже существующему — magic_link.
-[auth.email.template.magic_link]
-subject = "Код для входа в PetCare"
-content_path = "./supabase/templates/magic_link.html"
+# Включим, когда появится свой SMTP (ADR-015). Пока их объявление роняет
+# весь push секции auth: free-тариф со встроенной почтой запрещает менять шаблоны.
+# [auth.email.template.magic_link]
+# subject = "Код для входа в PetCare"
+# content_path = "./supabase/templates/magic_link.html"
+#
+# [auth.email.template.confirmation]
+# subject = "Код для входа в PetCare"
+# content_path = "./supabase/templates/confirmation.html"
 
-[auth.email.template.confirmation]
-subject = "Код для входа в PetCare"
-content_path = "./supabase/templates/confirmation.html"
+# auth.email.test_otp здесь не работает: config push относит его к неуправляемым,
+# это настройка только локальной разработки. Обход сделан входом по паролю (ADR-016).

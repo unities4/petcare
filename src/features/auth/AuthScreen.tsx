@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { supabase } from '../../lib/supabase'
+import { DevSignIn } from './DevSignIn'
 
 type Step = 'email' | 'code'
 
@@ -84,8 +85,10 @@ export function AuthScreen() {
         </form>
 
         <p className="hint" style={{ marginTop: 16 }}>
-          Пришлём шестизначный код. Пароль не нужен.
+          Пришлём код из {OTP_LENGTH} цифр. Пароль не нужен.
         </p>
+
+        {import.meta.env.DEV && <DevSignIn />}
       </div>
     )
   }
