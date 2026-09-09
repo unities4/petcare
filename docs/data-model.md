@@ -49,10 +49,12 @@
 
 ## Поле `events.details`
 
-Схема формы не проверяется базой, валидация на клиенте через Zod.
+Схема формы не проверяется базой, валидация на клиенте через Zod. Отклонения от
+рутины — это `feeding` с другим `kind`, а не отдельные типы событий (ADR-011).
 
 ```
-feeding     { food: string, grams?: number }
+feeding     { kind: 'meal'|'treat'|'table'|'scavenged',
+              food: string, grams?: number }
 symptom     { symptom: 'vomiting'|'diarrhea'|'refusal'|'lethargy'|'other',
               severity?: 1|2|3 }
 medication  { name: string, dose?: string }
@@ -66,7 +68,10 @@ weight      { kg: number }
 Что питомец ел за 24 часа до эпизода рвоты:
 
 ```sql
-select f.occurred_at, f.details ->> 'food' as food, f.details ->> 'grams' as grams
+select f.occurred_at,
+       f.details ->> 'kind'  as kind,      -- meal | treat | table | scavenged
+       f.details ->> 'food'  as food,
+       f.details ->> 'grams' as grams
 from events s
 join events f
   on f.pet_id = s.pet_id
@@ -75,6 +80,20 @@ join events f
 where s.id = :symptom_event_id
 order by f.occurred_at desc;
 ```
+
+Новый подтип попадает в этот запрос сам собой — фильтр идёт по `type`, а не по
+`kind`. В интерфейсе строки с `kind <> 'meal'` выделяются: именно они объясняют
+эпизод, а `meal` — фон.
+
+## Расхождения с текущими миграциями
+
+Здесь то, что решено в ADR, но ещё не залито в схему. Закрывается миграцией в
+соответствующей задаче, не правкой применённых файлов.
+
+- **`pets.default_food`** — корм по умолчанию (ADR-010). Нужен в задаче 2
+- **`pets.timezone`** — в миграции стоит default `'Europe/Amsterdam'`. Проверьте,
+  что это ваша зона: от неё считаются напоминания (ADR-001). Меняется при
+  создании питомца, но правильный default избавит от сюрприза
 
 ## Известные ограничения
 

@@ -1,50 +1,60 @@
 # PetCare
 
-PWA для совместного ухода за питомцем. Кормления, симптомы, здоровье, напоминания.
+PWA для семьи, которая ведёт одну собаку: что съела, когда стало плохо, когда
+пора кормить и давать таблетки. Главная платформа — iPhone, установленный на
+домашний экран.
 
-## Что в каркасе
+Зачем именно так и что осознанно не делаем — `docs/product.md`.
+
+## Что в репозитории
 
 ```
 CLAUDE.md                    конвенции проекта, читается Claude Code
 CHANGELOG.md                 журнал версий и правила отката
-docs/product.md              сценарии, границы MVP, дорожная карта
+docs/product.md              концепция, границы MVP, порядок задач
 docs/data-model.md           схема, роли, правила доступа
-docs/decisions.md            8 принятых решений с обоснованием (ADR)
+docs/decisions.md            11 принятых решений с обоснованием (ADR)
 docs/ios-pwa.md              ограничения iOS и чеклист проверки
+docs/apply-schema.md         применение миграций через Dashboard, без CLI
 supabase/migrations/         4 миграции: ядро, события, приглашения, тарифы
 ```
 
-Фронтенда пока нет — это следующий шаг.
+Фронтенда пока нет. Первая задача — установка на домашний экран и вход по коду.
 
-## Запуск с нуля
+## Подготовка (делается один раз, руками)
 
+Разработка идёт против облачной базы и публичного HTTPS-адреса с самого начала —
+иначе ничего нельзя проверить на телефоне (ADR-009). Локальный Docker не нужен.
+
+**1. Проект Supabase.** На supabase.com создайте проект (регион поближе,
+например Frankfurt). Запишите из Settings → API: `Project URL` и ключ `anon`.
+Ключ `service_role` не нужен нигде, кроме серверных функций, — на клиент он не
+попадает никогда.
+
+**2. Схема.** Примените четыре файла из `supabase/migrations/` по порядку имён —
+через SQL Editor по инструкции `docs/apply-schema.md`. Там же блок учёта
+применённых версий; заведите его до первого файла.
+
+**3. Настройки Auth.** Dashboard → Authentication:
+- Providers → Email включён, Confirm email включён
+- Email Templates → Magic Link: поставьте `{{ .Token }}` первым и крупно, ссылку
+  оставьте ниже запасным вариантом. Без этой правки пользователи на iPhone будут
+  кликать ссылку и вылетать из приложения (ADR-002)
+- URL Configuration → Redirect URLs: добавьте `http://localhost:5173` и адрес
+  будущего деплоя
+
+**4. Хостинг.** vercel.com → Add New Project → импорт этого репозитория с GitHub.
+Пока собирать нечего, поэтому проект можно создать и после первой задачи, но
+GitHub-репозиторий стоит завести сразу.
+
+**5. Ключи для пушей.** Понадобятся только в пятой задаче:
 ```bash
-# 1. Инструменты
-npm install -g supabase
-supabase login
-
-# 2. Локальная база (нужен Docker)
-supabase init          # если ещё нет supabase/config.toml
-supabase start
-supabase db reset      # применит все миграции из supabase/migrations
-
-# 3. Проект в облаке — создайте на supabase.com, затем
-supabase link --project-ref <ref>
-supabase db push
-
-# 4. Типы для фронтенда
-supabase gen types typescript --local > src/lib/database.types.ts
-
-# 5. Ключи для пушей (понадобятся в 5-й задаче)
 npx web-push generate-vapid-keys
-supabase secrets set VAPID_PUBLIC_KEY=... VAPID_PRIVATE_KEY=... VAPID_SUBJECT=mailto:you@example.com
 ```
 
-В настройках Auth проекта: включить Email provider, **выключить** «Confirm email»
-не нужно, а вот шаблон письма стоит отредактировать так, чтобы 6-значный код
-`{{ .Token }}` шёл первым и крупным (ADR-002).
-
 ## Проверка, что схема жива
+
+После шага 2, в SQL Editor:
 
 ```sql
 -- под первым пользователем
@@ -60,15 +70,8 @@ select * from pets;                             -- питомец виден
 Если второй пользователь видит питомца до принятия приглашения — сломан RLS,
 дальше не идём.
 
-## Первые задачи
+## Стек
 
-Порядок в `docs/product.md`. Начните с 1 и 2: вход и приглашения. Каждая задача —
-план, код, проверка на телефоне, коммит, запись в `CHANGELOG.md`.
-
-Стек фронтенда для первой задачи:
-
-```bash
-npm create vite@latest . -- --template react-ts
-npm i @supabase/supabase-js @tanstack/react-query
-npm i -D vite-plugin-pwa
-```
+Vite + React + TypeScript, `vite-plugin-pwa` (Workbox), TanStack Query.
+Supabase: Postgres + RLS, Auth (email OTP), Storage, Edge Functions.
+Напоминания: `pg_cron` + `pg_net` → Edge Function → Web Push (VAPID).
